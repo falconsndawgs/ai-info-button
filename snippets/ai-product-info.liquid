@@ -21,7 +21,15 @@
   <div class="ai-info-modal">
     <div class="ai-info-modal__header">
       <div class="ai-info-modal__header-text">
-        <h2 class="ai-info-modal__title" id="aiInfoModalTitle">AI Product Insights</h2>
+        <h2 class="ai-info-modal__title" id="aiInfoModalTitle">
+          AI Product Insights
+          <span class="ai-info-modal__title-by">by</span>
+          {% if shop.logo %}
+            <img class="ai-info-modal__shop-logo" src="{{ shop.logo | img_url: '120x40', crop: 'center' }}" alt="{{ shop.name | escape }}">
+          {% else %}
+            <span class="ai-info-modal__shop-name">{{ shop.name | escape }}</span>
+          {% endif %}
+        </h2>
         <div class="ai-info-modal__product-name"></div>
       </div>
       <img class="ai-info-modal__product-image" src="" alt="" hidden>
