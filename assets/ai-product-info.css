@@ -91,7 +91,7 @@
 .ai-info-modal__title::before {
   content: "✦";
   font-size: 14px;
-  color: #6c63ff;
+  color: #000000;
 }
 
 .ai-info-modal__close {
@@ -115,8 +115,8 @@
   padding: 12px 24px;
   font-size: 13px;
   font-weight: 600;
-  color: #6c63ff;
-  background: #f4f3ff;
+  color: #000000;
+  background: #f5f5f5;
   border-bottom: 1px solid #e8e8e8;
   flex-shrink: 0;
 }
@@ -145,7 +145,7 @@
   width: 20px;
   height: 20px;
   border: 2px solid #e0e0e0;
-  border-top-color: #6c63ff;
+  border-top-color: #000000;
   border-radius: 50%;
   animation: aiSpin 0.7s linear infinite;
   flex-shrink: 0;
@@ -185,7 +185,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #6c63ff;
+  color: #000000;
   margin: 16px 0 6px;
 }
 
@@ -206,20 +206,4 @@
   margin: 0 0 10px;
 }
 
-/* ── Dark mode ── */
-@media (prefers-color-scheme: dark) {
-  .ai-info-modal {
-    background: #1e1e2e;
-    color: #e0e0e0;
-  }
-  .ai-info-modal__header {
-    border-bottom-color: #333;
-  }
-  .ai-info-modal__product-name {
-    background: #2a2040;
-    border-bottom-color: #333;
-  }
-  .ai-info-modal__close { color: #888; }
-  .ai-info-modal__close:hover { color: #e0e0e0; }
-  .ai-info-modal__content { color: #ccc; }
-}
+
