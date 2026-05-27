@@ -24,11 +24,7 @@
         <h2 class="ai-info-modal__title" id="aiInfoModalTitle">
           AI Product Insights
           <span class="ai-info-modal__title-by">by</span>
-          {% if shop.logo %}
-            <img class="ai-info-modal__shop-logo" src="{{ shop.logo | img_url: '120x40', crop: 'center' }}" alt="{{ shop.name | escape }}">
-          {% else %}
-            <span class="ai-info-modal__shop-name">{{ shop.name | escape }}</span>
-          {% endif %}
+          <img class="ai-info-modal__shop-logo" src="//www.topmobility.com/cdn/shop/files/top_logo_final_2.png?v=1759506838&width=240" alt="Top Mobility">
         </h2>
         <div class="ai-info-modal__product-name"></div>
       </div>
