@@ -10,6 +10,45 @@
   const ENDPOINT =
     window.AI_PRODUCT_INFO_ENDPOINT || '/apps/ai-product-info';
 
+  // Common Shopify theme product image container selectors (most → least specific)
+  const IMAGE_CONTAINER_SELECTORS = [
+    '.product__media-wrapper',
+    '.product__media-item--image',
+    '.product__media',
+    '.product-single__photo-wrapper',
+    '.product-single__photo',
+    '.product-featured-img-wrapper',
+    '[data-product-featured-image]',
+    '.product__photo',
+    '.featured-image',
+  ];
+
+  function attachButtonToImage() {
+    const btn = document.querySelector('.ai-info-btn');
+    if (!btn) return;
+
+    let container = null;
+    for (const sel of IMAGE_CONTAINER_SELECTORS) {
+      container = document.querySelector(sel);
+      if (container) break;
+    }
+
+    if (!container) return; // leave in original position if no match
+
+    // Make sure the container is relatively positioned
+    const pos = getComputedStyle(container).position;
+    if (pos === 'static') container.style.position = 'relative';
+
+    container.appendChild(btn);
+  }
+
+  // Run after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachButtonToImage);
+  } else {
+    attachButtonToImage();
+  }
+
   // ── DOM refs (lazily resolved once per page) ──────────────────────────────
   let overlay, modal, closeBtn, loadingEl, errorEl, contentEl, productNameEl, productImageEl;
 
