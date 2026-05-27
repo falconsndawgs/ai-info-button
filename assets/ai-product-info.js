@@ -12,6 +12,7 @@
 
   // Common Shopify theme product image container selectors (most → least specific)
   const IMAGE_CONTAINER_SELECTORS = [
+    '.tm-desktop-panel > div',
     '.product__media-wrapper',
     '.product__media-item--image',
     '.product__media',
