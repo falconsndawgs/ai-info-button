@@ -3,7 +3,7 @@
  * Deploy to Vercel / Netlify Functions / any Node.js server.
  *
  * Environment variables required:
- *   GEMINI_API_KEY   — your Google Gemini API key (free at aistudio.google.com)
+ *   GROQ_API_KEY     — your Groq API key (free at console.groq.com)
  *   ALLOWED_ORIGIN   — your Shopify store URL (e.g. https://your-store.myshopify.com)
  *
  * Endpoint: POST /api/product-info
@@ -56,8 +56,8 @@ export default async function handler(req, res) {
     .filter(Boolean)
     .join('\n');
 
-  // ── OpenAI call ───────────────────────────────────────────────────────────
-  const apiKey = process.env.GEMINI_API_KEY;
+  // ── Groq call ─────────────────────────────────────────────────────────────
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: 'AI service not configured' });
   }
@@ -74,28 +74,35 @@ Use simple, friendly language. Keep each section concise (2-4 bullet points max)
 Respond ONLY with valid JSON in this exact shape:
 { "sections": [ { "heading": "...", "bullets": ["...", "..."] } ] }`;
 
-  let geminiData;
+  let groqData;
   try {
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    const groqResponse = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: productContext }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 600 },
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 600,
+          temperature: 0.4,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user',   content: productContext },
+          ],
         }),
       }
     );
 
-    if (!geminiResponse.ok) {
-      const errBody = await geminiResponse.text();
-      console.error('Gemini error:', errBody);
+    if (!groqResponse.ok) {
+      const errBody = await groqResponse.text();
+      console.error('Groq error:', errBody);
       return res.status(502).json({ error: 'AI service unavailable' });
     }
 
-    geminiData = await geminiResponse.json();
+    groqData = await groqResponse.json();
   } catch (err) {
     console.error('Fetch error:', err);
     return res.status(502).json({ error: 'AI service unavailable' });
@@ -104,7 +111,7 @@ Respond ONLY with valid JSON in this exact shape:
   // ── Parse & convert to HTML ───────────────────────────────────────────────
   let parsed;
   try {
-    const raw = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const raw = groqData.choices?.[0]?.message?.content || '';
     // Strip markdown code fences if present
     const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
     parsed = JSON.parse(jsonStr);
