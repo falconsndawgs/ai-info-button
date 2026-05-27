@@ -1,0 +1,38 @@
+{% comment %}
+  AI Product Info Button Snippet
+  Usage: {% render 'ai-product-info', product: product %}
+  Requires: ai-product-info.css and ai-product-info.js in assets/
+{% endcomment %}
+
+<button
+  class="ai-info-btn"
+  aria-label="Get AI information about this product"
+  data-product-title="{{ product.title | escape }}"
+  data-product-vendor="{{ product.vendor | escape }}"
+  data-product-type="{{ product.type | escape }}"
+  data-product-tags="{{ product.tags | join: ', ' | escape }}"
+  data-product-description="{{ product.description | strip_html | truncate: 500 | escape }}"
+>
+  ?
+</button>
+
+<div class="ai-info-overlay" id="aiInfoOverlay" role="dialog" aria-modal="true" aria-labelledby="aiInfoModalTitle" hidden>
+  <div class="ai-info-modal">
+    <div class="ai-info-modal__header">
+      <h2 class="ai-info-modal__title" id="aiInfoModalTitle">AI Product Insights</h2>
+      <button class="ai-info-modal__close" aria-label="Close">&times;</button>
+    </div>
+    <div class="ai-info-modal__product-name"></div>
+    <div class="ai-info-modal__body">
+      <div class="ai-info-modal__loading" hidden>
+        <span class="ai-info-modal__spinner"></span>
+        <span>Analyzing product...</span>
+      </div>
+      <div class="ai-info-modal__error" hidden></div>
+      <div class="ai-info-modal__content"></div>
+    </div>
+  </div>
+</div>
+
+{{ 'ai-product-info.css' | asset_url | stylesheet_tag }}
+{{ 'ai-product-info.js' | asset_url | script_tag }}

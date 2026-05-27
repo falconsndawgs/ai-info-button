@@ -1,0 +1,225 @@
+/* ── AI Info Button ── */
+.ai-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 0;
+  color: inherit;
+}
+
+.ai-info-btn:hover,
+.ai-info-btn:focus-visible {
+  opacity: 1;
+  transform: scale(1.1);
+  outline: none;
+}
+
+/* ── Overlay ── */
+.ai-info-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(2px);
+  animation: aiOverlayIn 0.2s ease;
+}
+
+.ai-info-overlay[hidden] {
+  display: none;
+}
+
+@keyframes aiOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Modal ── */
+.ai-info-modal {
+  background: #ffffff;
+  color: #1a1a1a;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  animation: aiModalIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+@keyframes aiModalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.ai-info-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+
+.ai-info-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-info-modal__title::before {
+  content: "✦";
+  font-size: 14px;
+  color: #6c63ff;
+}
+
+.ai-info-modal__close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #888;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s ease;
+}
+
+.ai-info-modal__close:hover {
+  color: #1a1a1a;
+}
+
+.ai-info-modal__product-name {
+  padding: 12px 24px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c63ff;
+  background: #f4f3ff;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+
+.ai-info-modal__body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Loading ── */
+.ai-info-modal__loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #555;
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+.ai-info-modal__loading[hidden] {
+  display: none;
+}
+
+.ai-info-modal__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e0e0e0;
+  border-top-color: #6c63ff;
+  border-radius: 50%;
+  animation: aiSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes aiSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Error ── */
+.ai-info-modal__error {
+  padding: 14px 16px;
+  background: #fff3f3;
+  border: 1px solid #ffd0d0;
+  border-radius: 8px;
+  color: #c0392b;
+  font-size: 14px;
+}
+
+.ai-info-modal__error[hidden] {
+  display: none;
+}
+
+/* ── Content ── */
+.ai-info-modal__content {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #333;
+}
+
+.ai-info-modal__content:empty {
+  display: none;
+}
+
+.ai-info-modal__content h3 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6c63ff;
+  margin: 16px 0 6px;
+}
+
+.ai-info-modal__content h3:first-child {
+  margin-top: 0;
+}
+
+.ai-info-modal__content ul {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+
+.ai-info-modal__content li {
+  margin-bottom: 4px;
+}
+
+.ai-info-modal__content p {
+  margin: 0 0 10px;
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  .ai-info-modal {
+    background: #1e1e2e;
+    color: #e0e0e0;
+  }
+  .ai-info-modal__header {
+    border-bottom-color: #333;
+  }
+  .ai-info-modal__product-name {
+    background: #2a2040;
+    border-bottom-color: #333;
+  }
+  .ai-info-modal__close { color: #888; }
+  .ai-info-modal__close:hover { color: #e0e0e0; }
+  .ai-info-modal__content { color: #ccc; }
+}
