@@ -12,6 +12,7 @@
   data-product-type="{{ product.type | escape }}"
   data-product-tags="{{ product.tags | join: ', ' | escape }}"
   data-product-description="{{ product.description | strip_html | truncate: 500 | escape }}"
+  data-product-image="{{ product.featured_image | img_url: '400x400' | escape }}"
 >
   ?
 </button>
@@ -19,10 +20,13 @@
 <div class="ai-info-overlay" id="aiInfoOverlay" role="dialog" aria-modal="true" aria-labelledby="aiInfoModalTitle" hidden>
   <div class="ai-info-modal">
     <div class="ai-info-modal__header">
-      <h2 class="ai-info-modal__title" id="aiInfoModalTitle">AI Product Insights</h2>
+      <div class="ai-info-modal__header-text">
+        <h2 class="ai-info-modal__title" id="aiInfoModalTitle">AI Product Insights</h2>
+        <div class="ai-info-modal__product-name"></div>
+      </div>
+      <img class="ai-info-modal__product-image" src="" alt="" hidden>
       <button class="ai-info-modal__close" aria-label="Close">&times;</button>
     </div>
-    <div class="ai-info-modal__product-name"></div>
     <div class="ai-info-modal__body">
       <div class="ai-info-modal__loading" hidden>
         <span class="ai-info-modal__spinner"></span>

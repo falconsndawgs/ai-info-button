@@ -11,16 +11,17 @@
     window.AI_PRODUCT_INFO_ENDPOINT || '/apps/ai-product-info';
 
   // ── DOM refs (lazily resolved once per page) ──────────────────────────────
-  let overlay, modal, closeBtn, loadingEl, errorEl, contentEl, productNameEl;
+  let overlay, modal, closeBtn, loadingEl, errorEl, contentEl, productNameEl, productImageEl;
 
   function resolveRefs() {
-    overlay       = document.getElementById('aiInfoOverlay');
-    modal         = overlay?.querySelector('.ai-info-modal');
-    closeBtn      = overlay?.querySelector('.ai-info-modal__close');
-    loadingEl     = overlay?.querySelector('.ai-info-modal__loading');
-    errorEl       = overlay?.querySelector('.ai-info-modal__error');
-    contentEl     = overlay?.querySelector('.ai-info-modal__content');
-    productNameEl = overlay?.querySelector('.ai-info-modal__product-name');
+    overlay         = document.getElementById('aiInfoOverlay');
+    modal           = overlay?.querySelector('.ai-info-modal');
+    closeBtn        = overlay?.querySelector('.ai-info-modal__close');
+    loadingEl       = overlay?.querySelector('.ai-info-modal__loading');
+    errorEl         = overlay?.querySelector('.ai-info-modal__error');
+    contentEl       = overlay?.querySelector('.ai-info-modal__content');
+    productNameEl   = overlay?.querySelector('.ai-info-modal__product-name');
+    productImageEl  = overlay?.querySelector('.ai-info-modal__product-image');
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -50,7 +51,16 @@
     if (!overlay) return;
 
     const title = btn.dataset.productTitle || '';
+    const image = btn.dataset.productImage || '';
     productNameEl.textContent = title;
+
+    if (image) {
+      productImageEl.src    = image;
+      productImageEl.alt    = title;
+      productImageEl.hidden = false;
+    } else {
+      productImageEl.hidden = true;
+    }
     overlay.hidden = false;
     document.body.style.overflow = 'hidden';
     closeBtn.focus();
