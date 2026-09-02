@@ -3,8 +3,10 @@
  * Deploy to Vercel / Netlify Functions / any Node.js server.
  *
  * Environment variables required:
- *   GROQ_API_KEY     — your Groq API key (free at console.groq.com)
+ *   GROQ_API_KEY     — optional Groq API key (free at console.groq.com)
  *   GROQ_MODEL       — optional Groq model override
+ *   GEMINI_API_KEY   — optional Gemini API key fallback
+ *   GEMINI_MODEL     — optional Gemini model override
  *   ALLOWED_ORIGIN   — your Shopify store URL (e.g. https://your-store.myshopify.com)
  *
  * Endpoint: POST /api/product-info
@@ -73,12 +75,14 @@ export default async function handler(req, res) {
     .filter(Boolean)
     .join('\n');
 
-  // ── Groq call ─────────────────────────────────────────────────────────────
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
+  // ── AI provider call ──────────────────────────────────────────────────────
+  const groqApiKey = process.env.GROQ_API_KEY;
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!groqApiKey && !geminiApiKey) {
     return res.status(500).json({ error: 'AI service not configured' });
   }
-  const model = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+  const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
   const systemPrompt = `You are a knowledgeable mobility product advisor for Top Mobility.
 Summarize the current product page for a shopper using only the provided product and page context. Do not invent specifications, pricing, warranties, compatibility, availability, or medical claims.
@@ -94,49 +98,39 @@ Use simple, friendly language. Keep each section concise (2-4 bullet points max)
 Respond ONLY with valid JSON in this exact shape:
 { "sections": [ { "heading": "...", "bullets": ["...", "..."] } ] }`;
 
-  let groqData;
-  try {
-    const groqResponse = await fetch(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 600,
-          temperature: 0.4,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user',   content: productContext },
-          ],
-        }),
-      }
-    );
+  let rawAiContent = '';
+  const providerErrors = [];
 
-    if (!groqResponse.ok) {
-      const errBody = await groqResponse.text();
-      console.error('Groq error:', errBody);
-      return res.status(502).json({
-        error: 'AI service unavailable',
-        detail: parseGroqErrorMessage(errBody),
-      });
+  if (groqApiKey) {
+    try {
+      rawAiContent = await callGroq({ apiKey: groqApiKey, model: groqModel, systemPrompt, productContext });
+    } catch (err) {
+      providerErrors.push(`Groq: ${err.message}`);
+      console.error('Groq provider failed:', err);
     }
+  }
 
-    groqData = await groqResponse.json();
-  } catch (err) {
-    console.error('Fetch error:', err);
-    return res.status(502).json({ error: 'AI service unavailable' });
+  if (!rawAiContent && geminiApiKey) {
+    try {
+      rawAiContent = await callGemini({ apiKey: geminiApiKey, model: geminiModel, systemPrompt, productContext });
+    } catch (err) {
+      providerErrors.push(`Gemini: ${err.message}`);
+      console.error('Gemini provider failed:', err);
+    }
+  }
+
+  if (!rawAiContent) {
+    return res.status(502).json({
+      error: 'AI service unavailable',
+      detail: providerErrors.join(' | ') || 'No AI provider returned a response',
+    });
   }
 
   // ── Parse & convert to HTML ───────────────────────────────────────────────
   let parsed;
   try {
-    const raw = groqData.choices?.[0]?.message?.content || '';
     // Strip markdown code fences if present
-    const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    const jsonStr = rawAiContent.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
     parsed = JSON.parse(jsonStr);
   } catch {
     return res.status(500).json({ error: 'Could not parse AI response' });
@@ -164,7 +158,82 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+async function callGroq({ apiKey, model, systemPrompt, productContext }) {
+  const groqResponse = await fetch(
+    'https://api.groq.com/openai/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 600,
+        temperature: 0.4,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: productContext },
+        ],
+      }),
+    }
+  );
+
+  if (!groqResponse.ok) {
+    const errBody = await groqResponse.text();
+    console.error('Groq error:', errBody);
+    throw new Error(parseGroqErrorMessage(errBody));
+  }
+
+  const groqData = await groqResponse.json();
+  return groqData.choices?.[0]?.message?.content || '';
+}
+
+async function callGemini({ apiKey, model, systemPrompt, productContext }) {
+  const geminiResponse = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }],
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: productContext }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 600,
+          responseMimeType: 'application/json',
+        },
+      }),
+    }
+  );
+
+  if (!geminiResponse.ok) {
+    const errBody = await geminiResponse.text();
+    console.error('Gemini error:', errBody);
+    throw new Error(parseGeminiErrorMessage(errBody));
+  }
+
+  const geminiData = await geminiResponse.json();
+  return geminiData.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
+}
+
 function parseGroqErrorMessage(body) {
+  try {
+    const parsed = JSON.parse(body);
+    return parsed?.error?.message || parsed?.message || body;
+  } catch {
+    return body;
+  }
+}
+
+function parseGeminiErrorMessage(body) {
   try {
     const parsed = JSON.parse(body);
     return parsed?.error?.message || parsed?.message || body;
