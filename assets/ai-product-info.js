@@ -129,9 +129,10 @@
   }
 
   function getProductScope(btn) {
-    return btn.closest('[id^="MainProduct-"], product-info, .product, main') ||
-      document.querySelector('[id^="MainProduct-"]') ||
+    return document.querySelector('[id^="MainProduct-"]') ||
+      btn.closest('main') ||
       document.querySelector('product-info') ||
+      btn.closest('.product') ||
       document;
   }
 
@@ -142,12 +143,12 @@
         const heading = cleanText(
           section.querySelector('summary, .accordion__title, h2, h3, h4')?.textContent
         );
-        const body = truncateText(section.textContent, 900);
+        const body = truncateText(section.textContent, 1400);
         if (!heading && !body) return null;
         return { heading: heading, text: body };
       })
       .filter(Boolean)
-      .slice(0, 8);
+      .slice(0, 12);
 
     const context = {
       url: window.location.href,
@@ -158,7 +159,7 @@
       description: truncateText(
         readFirstText(scope, ['.product__description', '[data-product-description]']) ||
           btn.dataset.productDescription,
-        1800
+        3000
       ),
       price: truncateText(readFirstText(scope, ['#vs-price-row', '.price', '.product__price']), 300),
       selectedOptions: collectVisibleTexts(
@@ -170,11 +171,11 @@
       highlights: collectVisibleTexts(
         scope,
         ['.product__text', '.product__subtitle', '.product__inventory', '.badge', '.rte li'],
-        14,
-        180
+        24,
+        240
       ),
       sections: accordions,
-      pageText: truncateText(scope.textContent, 5000),
+      pageText: truncateText(scope.textContent, 12000),
     };
 
     return context;
@@ -202,7 +203,7 @@
     });
     parts.push('Visible product page text: ' + context.pageText);
 
-    return truncateText(parts.filter(Boolean).join('\n'), 9000);
+    return truncateText(parts.filter(Boolean).join('\n'), 18000);
   }
 
   function openModal(btn) {

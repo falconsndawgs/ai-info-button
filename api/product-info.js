@@ -61,7 +61,7 @@ export default async function handler(req, res) {
   const pageContextText = safeLong(
     page_context ||
       (pageContext ? JSON.stringify(pageContext) : ''),
-    9000
+    16000
   );
 
   const productContext = [
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     vendor      ? `Brand: ${safe(vendor)}`      : null,
     type        ? `Category: ${safe(type)}`      : null,
     tags        ? `Tags: ${safe(tags)}`          : null,
-    description ? `Description: ${safe(description)}` : null,
+    description ? `Description: ${safeLong(description, 2500)}` : null,
     pageContextText ? `Page context:\n${pageContextText}` : null,
   ]
     .filter(Boolean)
@@ -85,16 +85,19 @@ export default async function handler(req, res) {
   const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   const systemPrompt = `You are a knowledgeable mobility product advisor for Top Mobility.
-Summarize the current product page for a shopper using only the provided product and page context. Do not invent specifications, pricing, warranties, compatibility, availability, or medical claims.
+Create a detailed, shopper-facing summary of the current product page using only the provided product and page context. Do not invent specifications, prices, warranties, compatibility, stock status, medical claims, or measurements that are not present in the context.
 
-Return a helpful, structured summary using only these sections (omit any section if not applicable):
-- What it is
-- Key benefits
-- Who it's for
-- How to use
-- Things to know
+Return a full product summarization. Use the most relevant of these sections and omit only sections with no supporting context:
+- Product overview
+- Key specifications and performance
+- Comfort and usability
+- Safety and reliability
+- Options, upgrades, and configuration
+- Best fit / who should consider it
+- Buying considerations
+- What's included or page notes
 
-Use simple, friendly language. Keep each section concise (2-4 bullet points max). Prefer page-specific details over generic category advice.
+Use clear retail language. Include concrete page-specific details such as price, dimensions, range, speed, capacity, warranty, shipping notes, configuration choices, and compatibility only when they appear in the context. Prefer 3-6 useful bullets per section, but keep each bullet concise.
 Respond ONLY with valid JSON in this exact shape:
 { "sections": [ { "heading": "...", "bullets": ["...", "..."] } ] }`;
 
@@ -178,7 +181,7 @@ async function callGroq({ apiKey, model, systemPrompt, productContext }) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 600,
+        max_tokens: 1600,
         temperature: 0.4,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -219,7 +222,7 @@ async function callGemini({ apiKey, model, systemPrompt, productContext }) {
         ],
         generationConfig: {
           temperature: 0.4,
-          maxOutputTokens: 600,
+          maxOutputTokens: 1600,
           responseMimeType: 'application/json',
         },
       }),
