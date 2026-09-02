@@ -4,10 +4,11 @@
  *
  * Environment variables required:
  *   GROQ_API_KEY     — your Groq API key (free at console.groq.com)
+ *   GROQ_MODEL       — optional Groq model override
  *   ALLOWED_ORIGIN   — your Shopify store URL (e.g. https://your-store.myshopify.com)
  *
  * Endpoint: POST /api/product-info
- * Body: { title, vendor, type, tags, description }
+ * Body: { title, vendor, type, tags, description, page_context, pageContext }
  * Returns: { html: "<formatted AI response>" }
  */
 
@@ -33,7 +34,7 @@ export default async function handler(req, res) {
   }
 
   // ── Input validation ──────────────────────────────────────────────────────
-  const { title, vendor, type, tags, description } = req.body || {};
+  const { title, vendor, type, tags, description, page_context, pageContext } = req.body || {};
 
   if (!title || typeof title !== 'string') {
     return res.status(400).json({ error: 'Missing product title' });
@@ -46,12 +47,28 @@ export default async function handler(req, res) {
       .trim()
       .slice(0, 500);
 
+  const safeLong = (val, maxLength = 9000) =>
+    String(val || '')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ' ')
+      .replace(/\s+\n/g, '\n')
+      .replace(/\n\s+/g, '\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim()
+      .slice(0, maxLength);
+
+  const pageContextText = safeLong(
+    page_context ||
+      (pageContext ? JSON.stringify(pageContext) : ''),
+    9000
+  );
+
   const productContext = [
     `Product: ${safe(title)}`,
     vendor      ? `Brand: ${safe(vendor)}`      : null,
     type        ? `Category: ${safe(type)}`      : null,
     tags        ? `Tags: ${safe(tags)}`          : null,
     description ? `Description: ${safe(description)}` : null,
+    pageContextText ? `Page context:\n${pageContextText}` : null,
   ]
     .filter(Boolean)
     .join('\n');
@@ -61,16 +78,19 @@ export default async function handler(req, res) {
   if (!apiKey) {
     return res.status(500).json({ error: 'AI service not configured' });
   }
+  const model = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 
-  const systemPrompt = `You are a knowledgeable product advisor.
-When given a product, return a helpful, structured summary using only these sections (omit any section if not applicable):
+  const systemPrompt = `You are a knowledgeable mobility product advisor for Top Mobility.
+Summarize the current product page for a shopper using only the provided product and page context. Do not invent specifications, pricing, warranties, compatibility, availability, or medical claims.
+
+Return a helpful, structured summary using only these sections (omit any section if not applicable):
 - What it is
 - Key benefits
 - Who it's for
 - How to use
 - Things to know
 
-Use simple, friendly language. Keep each section concise (2-4 bullet points max).
+Use simple, friendly language. Keep each section concise (2-4 bullet points max). Prefer page-specific details over generic category advice.
 Respond ONLY with valid JSON in this exact shape:
 { "sections": [ { "heading": "...", "bullets": ["...", "..."] } ] }`;
 
@@ -85,7 +105,7 @@ Respond ONLY with valid JSON in this exact shape:
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model,
           max_tokens: 600,
           temperature: 0.4,
           messages: [
@@ -99,7 +119,10 @@ Respond ONLY with valid JSON in this exact shape:
     if (!groqResponse.ok) {
       const errBody = await groqResponse.text();
       console.error('Groq error:', errBody);
-      return res.status(502).json({ error: 'AI service unavailable' });
+      return res.status(502).json({
+        error: 'AI service unavailable',
+        detail: parseGroqErrorMessage(errBody),
+      });
     }
 
     groqData = await groqResponse.json();
@@ -139,4 +162,13 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function parseGroqErrorMessage(body) {
+  try {
+    const parsed = JSON.parse(body);
+    return parsed?.error?.message || parsed?.message || body;
+  } catch {
+    return body;
+  }
 }

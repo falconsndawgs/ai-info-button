@@ -9,6 +9,9 @@
 
   const ENDPOINT =
     window.AI_PRODUCT_INFO_ENDPOINT || '/apps/ai-product-info';
+  const FALLBACK_ENDPOINT = '/apps/ai-product-info';
+  const DEFAULT_ERROR_MESSAGE =
+    'AI Product Insights are temporarily unavailable. Please try again shortly.';
 
   // Common Shopify theme product image container selectors (most → least specific)
   const IMAGE_CONTAINER_SELECTORS = [
@@ -86,6 +89,121 @@
     contentEl.innerHTML = html;
   }
 
+  function cleanText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function truncateText(value, maxLength) {
+    const text = cleanText(value);
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength - 1).trim() + '...';
+  }
+
+  function uniqueTexts(texts) {
+    const seen = new Set();
+    return texts.map(cleanText).filter(function (text) {
+      if (!text || seen.has(text.toLowerCase())) return false;
+      seen.add(text.toLowerCase());
+      return true;
+    });
+  }
+
+  function readFirstText(scope, selectors) {
+    for (const selector of selectors) {
+      const node = scope.querySelector(selector) || document.querySelector(selector);
+      const text = cleanText(node?.textContent);
+      if (text) return text;
+    }
+    return '';
+  }
+
+  function collectVisibleTexts(scope, selectors, maxItems, maxLength) {
+    const nodes = selectors.flatMap(function (selector) {
+      return Array.from(scope.querySelectorAll(selector));
+    });
+
+    return uniqueTexts(nodes.map(function (node) {
+      return truncateText(node.textContent, maxLength);
+    })).slice(0, maxItems);
+  }
+
+  function getProductScope(btn) {
+    return btn.closest('[id^="MainProduct-"], product-info, .product, main') ||
+      document.querySelector('[id^="MainProduct-"]') ||
+      document.querySelector('product-info') ||
+      document;
+  }
+
+  function collectPageContext(btn) {
+    const scope = getProductScope(btn);
+    const accordions = Array.from(scope.querySelectorAll('details, .accordion, collapsible-content'))
+      .map(function (section) {
+        const heading = cleanText(
+          section.querySelector('summary, .accordion__title, h2, h3, h4')?.textContent
+        );
+        const body = truncateText(section.textContent, 900);
+        if (!heading && !body) return null;
+        return { heading: heading, text: body };
+      })
+      .filter(Boolean)
+      .slice(0, 8);
+
+    const context = {
+      url: window.location.href,
+      title: btn.dataset.productTitle || readFirstText(scope, ['h1', '.product__title']),
+      vendor: btn.dataset.productVendor || '',
+      type: btn.dataset.productType || '',
+      tags: btn.dataset.productTags || '',
+      description: truncateText(
+        readFirstText(scope, ['.product__description', '[data-product-description]']) ||
+          btn.dataset.productDescription,
+        1800
+      ),
+      price: truncateText(readFirstText(scope, ['#vs-price-row', '.price', '.product__price']), 300),
+      selectedOptions: collectVisibleTexts(
+        scope,
+        ['#vs-root [id^="vs-sel-"]', '.product-form__input input:checked + label', '.product-form__input select option:checked'],
+        12,
+        140
+      ),
+      highlights: collectVisibleTexts(
+        scope,
+        ['.product__text', '.product__subtitle', '.product__inventory', '.badge', '.rte li'],
+        14,
+        180
+      ),
+      sections: accordions,
+      pageText: truncateText(scope.textContent, 5000),
+    };
+
+    return context;
+  }
+
+  function buildPageContextText(context) {
+    const parts = [
+      'URL: ' + context.url,
+      'Product: ' + context.title,
+      'Vendor: ' + context.vendor,
+      'Type: ' + context.type,
+      'Tags: ' + context.tags,
+      'Price: ' + context.price,
+      'Description: ' + context.description,
+    ];
+
+    if (context.selectedOptions.length) {
+      parts.push('Selected options: ' + context.selectedOptions.join(' | '));
+    }
+    if (context.highlights.length) {
+      parts.push('Page highlights: ' + context.highlights.join(' | '));
+    }
+    context.sections.forEach(function (section) {
+      parts.push((section.heading || 'Product section') + ': ' + section.text);
+    });
+    parts.push('Visible product page text: ' + context.pageText);
+
+    return truncateText(parts.filter(Boolean).join('\n'), 9000);
+  }
+
   function openModal(btn) {
     if (!overlay) resolveRefs();
     if (!overlay) return;
@@ -128,30 +246,52 @@
       tags:        btn.dataset.productTags        || '',
       description: btn.dataset.productDescription || '',
     };
+    const pageContext = collectPageContext(btn);
+    payload.pageContext = pageContext;
+    payload.page_context = buildPageContextText(pageContext);
 
-    try {
-      const response = await fetch(ENDPOINT, {
+    async function requestInfo(endpoint) {
+      const response = await fetch(endpoint, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        throw new Error(`Request failed (${response.status})`);
+      let data = null;
+      let text = '';
+      try {
+        data = await response.clone().json();
+      } catch (jsonErr) {
+        text = await response.text();
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        const detail = data?.error || data?.message || text || `Request failed (${response.status})`;
+        throw new Error(detail);
+      }
 
       if (!data || !data.html) {
-        throw new Error('No information returned from AI.');
+        throw new Error(data?.error || data?.message || 'No information returned from AI.');
       }
 
-      showContent(data.html);
+      return data.html;
+    }
+
+    try {
+      let html;
+      try {
+        html = await requestInfo(ENDPOINT);
+      } catch (primaryErr) {
+        if (ENDPOINT === FALLBACK_ENDPOINT) throw primaryErr;
+        console.warn('[ai-product-info] primary endpoint failed, trying app proxy fallback:', primaryErr);
+        html = await requestInfo(FALLBACK_ENDPOINT);
+      }
+
+      showContent(html);
     } catch (err) {
       if (isFetching) {
-        showError(
-          err.message || 'Something went wrong. Please try again.'
-        );
+        console.error('[ai-product-info] request failed:', err);
+        showError(DEFAULT_ERROR_MESSAGE);
       }
     } finally {
       isFetching = false;
