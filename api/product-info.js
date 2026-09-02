@@ -86,7 +86,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'AI service not configured' });
   }
   const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-  const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
   const systemPrompt = `You are a knowledgeable mobility product advisor for Top Mobility.
 Create a detailed, shopper-facing summary of the current product page using only the provided product and page context. Do not invent specifications, prices, warranties, compatibility, stock status, medical claims, or measurements that are not present in the context.
@@ -108,21 +108,21 @@ Respond ONLY with valid JSON in this exact shape:
   let rawAiContent = '';
   const providerErrors = [];
 
-  if (groqApiKey) {
-    try {
-      rawAiContent = await callGroq({ apiKey: groqApiKey, model: groqModel, systemPrompt, productContext });
-    } catch (err) {
-      providerErrors.push(`Groq: ${err.message}`);
-      console.error('Groq provider failed:', err);
-    }
-  }
-
-  if (!rawAiContent && geminiApiKey) {
+  if (geminiApiKey) {
     try {
       rawAiContent = await callGemini({ apiKey: geminiApiKey, model: geminiModel, systemPrompt, productContext });
     } catch (err) {
       providerErrors.push(`Gemini: ${err.message}`);
       console.error('Gemini provider failed:', err);
+    }
+  }
+
+  if (!rawAiContent && groqApiKey) {
+    try {
+      rawAiContent = await callGroq({ apiKey: groqApiKey, model: groqModel, systemPrompt, productContext });
+    } catch (err) {
+      providerErrors.push(`Groq: ${err.message}`);
+      console.error('Groq provider failed:', err);
     }
   }
 
