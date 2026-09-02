@@ -120,10 +120,16 @@ Respond ONLY with valid JSON in this exact shape:
   }
 
   if (!rawAiContent) {
-    return res.status(502).json({
-      error: 'AI service unavailable',
-      detail: providerErrors.join(' | ') || 'No AI provider returned a response',
-    });
+    const fallbackHtml = buildFallbackHtml({ title, vendor, type, description, pageContextText });
+    if (fallbackHtml) {
+      return res.status(200).json({
+        html: fallbackHtml,
+        fallback: true,
+        detail: providerErrors.join(' | ') || 'No AI provider returned a response',
+      });
+    }
+
+    return res.status(502).json({ error: 'AI service unavailable', detail: providerErrors.join(' | ') });
   }
 
   // ── Parse & convert to HTML ───────────────────────────────────────────────
@@ -159,10 +165,13 @@ function escapeHtml(str) {
 }
 
 async function callGroq({ apiKey, model, systemPrompt, productContext }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
   const groqResponse = await fetch(
     'https://api.groq.com/openai/v1/chat/completions',
     {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
@@ -177,7 +186,7 @@ async function callGroq({ apiKey, model, systemPrompt, productContext }) {
         ],
       }),
     }
-  );
+  ).finally(() => clearTimeout(timeout));
 
   if (!groqResponse.ok) {
     const errBody = await groqResponse.text();
@@ -190,10 +199,13 @@ async function callGroq({ apiKey, model, systemPrompt, productContext }) {
 }
 
 async function callGemini({ apiKey, model, systemPrompt, productContext }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
   const geminiResponse = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
+      signal: controller.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: {
@@ -212,7 +224,7 @@ async function callGemini({ apiKey, model, systemPrompt, productContext }) {
         },
       }),
     }
-  );
+  ).finally(() => clearTimeout(timeout));
 
   if (!geminiResponse.ok) {
     const errBody = await geminiResponse.text();
@@ -240,4 +252,22 @@ function parseGeminiErrorMessage(body) {
   } catch {
     return body;
   }
+}
+
+function buildFallbackHtml({ title, vendor, type, description, pageContextText }) {
+  const bullets = [
+    title ? `${title} is listed as ${type || 'a mobility product'}${vendor ? ` from ${vendor}` : ''}.` : '',
+    description || pageContextText ? summarizeText(description || pageContextText, 180) : '',
+    pageContextText ? 'Review the product page details for current pricing, options, shipping notes, and compatibility information.' : '',
+  ].filter(Boolean);
+
+  if (!bullets.length) return '';
+
+  return `<h3>What it is</h3><ul>${bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join('')}</ul>`;
+}
+
+function summarizeText(value, maxLength) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1).trim()}...`;
 }
