@@ -86,7 +86,10 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'AI service not configured' });
   }
   const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-  const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const geminiModels = (process.env.GEMINI_MODEL || 'gemini-3.6-flash,gemini-3.6-flash-lite')
+    .split(',')
+    .map((model) => model.trim())
+    .filter(Boolean);
 
   const systemPrompt = `You are a knowledgeable mobility product advisor for Top Mobility.
 Create a detailed, shopper-facing summary of the current product page using only the provided product and page context. Do not invent specifications, prices, warranties, compatibility, stock status, medical claims, or measurements that are not present in the context.
@@ -109,11 +112,14 @@ Respond ONLY with valid JSON in this exact shape:
   const providerErrors = [];
 
   if (geminiApiKey) {
-    try {
-      rawAiContent = await callGemini({ apiKey: geminiApiKey, model: geminiModel, systemPrompt, productContext });
-    } catch (err) {
-      providerErrors.push(`Gemini: ${err.message}`);
-      console.error('Gemini provider failed:', err);
+    for (const geminiModel of geminiModels) {
+      try {
+        rawAiContent = await callGemini({ apiKey: geminiApiKey, model: geminiModel, systemPrompt, productContext });
+        break;
+      } catch (err) {
+        providerErrors.push(`Gemini ${geminiModel}: ${err.message}`);
+        console.error(`Gemini provider failed (${geminiModel}):`, err);
+      }
     }
   }
 
@@ -259,19 +265,72 @@ function parseGeminiErrorMessage(body) {
 }
 
 function buildFallbackHtml({ title, vendor, type, description, pageContextText }) {
-  const bullets = [
-    title ? `${title} is listed as ${type || 'a mobility product'}${vendor ? ` from ${vendor}` : ''}.` : '',
-    description || pageContextText ? summarizeText(description || pageContextText, 180) : '',
-    pageContextText ? 'Review the product page details for current pricing, options, shipping notes, and compatibility information.' : '',
-  ].filter(Boolean);
+  const sourceText = `${description || ''}\n${pageContextText || ''}`;
+  const sections = [
+    {
+      heading: 'Product overview',
+      bullets: [
+        title ? `${title} is listed as ${type || 'a mobility product'}${vendor ? ` from ${vendor}` : ''}.` : '',
+        summarizeText(description || findFirstMatch(sourceText, ['overview', 'description', 'product']), 260),
+      ],
+    },
+    {
+      heading: 'Key specifications and performance',
+      bullets: findMatches(sourceText, ['capacity', 'range', 'speed', 'mph', 'mile', 'battery', 'weight', 'turning', 'ground clearance', 'suspension'], 6),
+    },
+    {
+      heading: 'Comfort and usability',
+      bullets: findMatches(sourceText, ['seat', 'armrest', 'tiller', 'comfort', 'swivel', 'adjustable', 'fold', 'portable', 'basket'], 5),
+    },
+    {
+      heading: 'Safety and reliability',
+      bullets: findMatches(sourceText, ['brake', 'light', 'led', 'stable', 'stability', 'safety', 'wheel', 'tire', 'anti-tip'], 5),
+    },
+    {
+      heading: 'Options, upgrades, and configuration',
+      bullets: findMatches(sourceText, ['option', 'upgrade', 'color', 'configuration', 'selected', 'accessory', 'warranty', 'delivery'], 5),
+    },
+    {
+      heading: 'Buying considerations',
+      bullets: findMatches(sourceText, ['shipping', 'delivery', 'warranty', 'price', 'compatibility', 'vehicle', 'home', 'storage', 'consider'], 5),
+    },
+  ]
+    .map((section) => ({
+      heading: section.heading,
+      bullets: section.bullets.map((bullet) => summarizeText(bullet, 240)).filter(Boolean),
+    }))
+    .filter((section) => section.bullets.length);
 
-  if (!bullets.length) return '';
+  if (!sections.length) return '';
 
-  return `<h3>What it is</h3><ul>${bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join('')}</ul>`;
+  return sections
+    .map((section) => `<h3>${escapeHtml(section.heading)}</h3><ul>${section.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join('')}</ul>`)
+    .join('');
 }
 
 function summarizeText(value, maxLength) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1).trim()}...`;
+}
+
+function findFirstMatch(text, keywords) {
+  return findMatches(text, keywords, 1)[0] || '';
+}
+
+function findMatches(text, keywords, limit) {
+  const seen = new Set();
+  return String(text || '')
+    .split(/[\n.;|]+/)
+    .map((line) => line.replace(/^[\s\-:]+/, '').trim())
+    .filter((line) => {
+      if (!line || line.length < 12) return false;
+      const lower = line.toLowerCase();
+      if (!keywords.some((keyword) => lower.includes(keyword))) return false;
+      const key = lower.slice(0, 120);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
 }
