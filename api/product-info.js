@@ -265,13 +265,14 @@ function parseGeminiErrorMessage(body) {
 }
 
 function buildFallbackHtml({ title, vendor, type, description, pageContextText }) {
-  const sourceText = `${description || ''}\n${pageContextText || ''}`;
+  const sourceText = pageContextText || '';
+  const category = type && String(type).toLowerCase() !== 'main' ? type : '';
   const sections = [
     {
       heading: 'Product overview',
       bullets: [
-        title ? `${title} is listed as ${type || 'a mobility product'}${vendor ? ` from ${vendor}` : ''}.` : '',
-        summarizeText(description || findFirstMatch(sourceText, ['overview', 'description', 'product']), 260),
+        title ? `${title}${vendor ? ` from ${vendor}` : ''}${category ? ` is a ${category}` : ''}.` : '',
+        summarizeText(cleanFallbackLine(description || findFirstMatch(sourceText, ['overview', 'description', 'product'])), 220),
       ],
     },
     {
@@ -295,10 +296,20 @@ function buildFallbackHtml({ title, vendor, type, description, pageContextText }
       bullets: findMatches(sourceText, ['shipping', 'delivery', 'warranty', 'price', 'compatibility', 'vehicle', 'home', 'storage', 'consider'], 5),
     },
   ]
-    .map((section) => ({
-      heading: section.heading,
-      bullets: section.bullets.map((bullet) => summarizeText(bullet, 240)).filter(Boolean),
-    }))
+    .reduce((result, section) => {
+      const used = result.used;
+      const bullets = section.bullets
+        .map((bullet) => summarizeText(bullet, 240))
+        .filter(Boolean)
+        .filter((bullet) => {
+          const key = bullet.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 120);
+          if (!key || used.has(key)) return false;
+          used.add(key);
+          return true;
+        });
+      if (bullets.length) result.sections.push({ heading: section.heading, bullets });
+      return result;
+    }, { sections: [], used: new Set() }).sections
     .filter((section) => section.bullets.length);
 
   if (!sections.length) return '';
@@ -321,10 +332,10 @@ function findFirstMatch(text, keywords) {
 function findMatches(text, keywords, limit) {
   const seen = new Set();
   return String(text || '')
-    .split(/[\n.;|]+/)
-    .map((line) => line.replace(/^[\s\-:]+/, '').trim())
+    .split(/[\n;|]+/)
+    .map(cleanFallbackLine)
     .filter((line) => {
-      if (!line || line.length < 12) return false;
+      if (!isUsefulFallbackLine(line)) return false;
       const lower = line.toLowerCase();
       if (!keywords.some((keyword) => lower.includes(keyword))) return false;
       const key = lower.slice(0, 120);
@@ -333,4 +344,25 @@ function findMatches(text, keywords, limit) {
       return true;
     })
     .slice(0, limit);
+}
+
+function cleanFallbackLine(line) {
+  return String(line || '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\b\S+\.com\/\S+/gi, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/^[\s\-:]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isUsefulFallbackLine(line) {
+  if (!line || line.length < 12) return false;
+  if (line.length > 260) return false;
+  const lower = line.toLowerCase();
+  if (/^[.#]?[a-z0-9_-]+\s*[{:]?/i.test(line) && /[#;{}]|font-|color:|display:|width:|height:/.test(line)) return false;
+  if (/font-weight|rgba?\(|--|display:|padding:|margin:|border|object-fit|srcset|cdn\/shop|svg|json|schema|variant|function\(/i.test(line)) return false;
+  if (/secure checkout|ssl encryption|price match guarantee|easy returns|skip to|image \d+|gallery view|watch product video/i.test(line)) return false;
+  if (/^product:|^vendor:|^type:|^tags:|^url:/i.test(line)) return false;
+  return /\d|capacity|range|speed|mph|mile|battery|seat|armrest|tiller|suspension|brake|light|led|tire|wheel|warranty|shipping|delivery|option|upgrade|comfort|safety|portable|fold|basket|ground clearance|turning/i.test(lower);
 }

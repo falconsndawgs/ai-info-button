@@ -128,6 +128,35 @@
     })).slice(0, maxItems);
   }
 
+  function readCleanScopeText(scope) {
+    const clone = scope.cloneNode(true);
+    clone.querySelectorAll('script, style, svg, noscript, iframe, form, button, select, option, template, .ai-info-overlay, .ai-info-btn').forEach(function (node) {
+      node.remove();
+    });
+
+    return cleanText(clone.innerText || clone.textContent || '');
+  }
+
+  function collectSpecTexts(scope) {
+    return collectVisibleTexts(
+      scope,
+      [
+        'table tr',
+        '.product__description li',
+        '.product__description p',
+        '.rte li',
+        '.rte p',
+        '[class*="spec"] li',
+        '[class*="feature"] li',
+        '[class*="highlight"] li',
+      ],
+      40,
+      260
+    ).filter(function (text) {
+      return !/font-|color:|display:|padding:|margin:|schema|cdn\/shop|secure checkout|price match/i.test(text);
+    });
+  }
+
   function getProductScope(btn) {
     return document.querySelector('[id^="MainProduct-"]') ||
       btn.closest('main') ||
@@ -174,8 +203,9 @@
         24,
         240
       ),
+      specs: collectSpecTexts(scope),
       sections: accordions,
-      pageText: truncateText(scope.textContent, 12000),
+      pageText: truncateText(readCleanScopeText(scope), 7000),
     };
 
     return context;
@@ -198,12 +228,15 @@
     if (context.highlights.length) {
       parts.push('Page highlights: ' + context.highlights.join(' | '));
     }
+    if (context.specs.length) {
+      parts.push('Specs and page details: ' + context.specs.join(' | '));
+    }
     context.sections.forEach(function (section) {
       parts.push((section.heading || 'Product section') + ': ' + section.text);
     });
-    parts.push('Visible product page text: ' + context.pageText);
+    if (context.pageText) parts.push('Clean product page text: ' + context.pageText);
 
-    return truncateText(parts.filter(Boolean).join('\n'), 18000);
+    return truncateText(parts.filter(Boolean).join('\n'), 14000);
   }
 
   function openModal(btn) {
