@@ -157,6 +157,29 @@
     });
   }
 
+  function collectNarrativeTexts(scope) {
+    return collectVisibleTexts(
+      scope,
+      [
+        '.product__description p',
+        '.product__description li',
+        '.rte p',
+        '.rte li',
+        '.tab-content p',
+        '.tab-content li',
+        '[class*="description"] p',
+        '[class*="benefit"] li',
+        '[class*="bullet"] li',
+      ],
+      28,
+      320
+    ).filter(function (text) {
+      if (/font-|color:|display:|padding:|margin:|schema|cdn\/shop|secure checkout|price match/i.test(text)) return false;
+      if (/^\s*(capacity|range|speed|weight|turning radius|ground clearance|seat width|seat depth)\s*[:\-]/i.test(text)) return false;
+      return /[a-z]{4,}/i.test(text) && text.split(/\s+/).length >= 6;
+    });
+  }
+
   function getProductScope(btn) {
     return document.querySelector('[id^="MainProduct-"]') ||
       btn.closest('main') ||
@@ -203,6 +226,7 @@
         24,
         240
       ),
+      narrative: collectNarrativeTexts(scope),
       specs: collectSpecTexts(scope),
       sections: accordions,
       pageText: truncateText(readCleanScopeText(scope), 7000),
@@ -227,6 +251,9 @@
     }
     if (context.highlights.length) {
       parts.push('Page highlights: ' + context.highlights.join(' | '));
+    }
+    if (context.narrative.length) {
+      parts.push('Product description and benefits: ' + context.narrative.join(' | '));
     }
     if (context.specs.length) {
       parts.push('Specs and page details: ' + context.specs.join(' | '));

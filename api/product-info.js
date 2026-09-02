@@ -96,6 +96,7 @@ Create a detailed, shopper-facing summary of the current product page using only
 
 Return a full product summarization. Use the most relevant of these sections and omit only sections with no supporting context:
 - Product overview
+- Why it matters
 - Key specifications and performance
 - Comfort and usability
 - Safety and reliability
@@ -104,7 +105,7 @@ Return a full product summarization. Use the most relevant of these sections and
 - Buying considerations
 - What's included or page notes
 
-Use clear retail language. Include concrete page-specific details such as price, dimensions, range, speed, capacity, warranty, shipping notes, configuration choices, and compatibility only when they appear in the context. Prefer 3-6 useful bullets per section, but keep each bullet concise.
+Use clear retail language. Start with the product's purpose, shopper problem, and practical benefits from the description before listing specs. Include concrete page-specific details such as price, dimensions, range, speed, capacity, warranty, shipping notes, configuration choices, and compatibility only when they appear in the context. Prefer 3-5 useful bullets per section, but keep each bullet concise.
 Respond ONLY with valid JSON in this exact shape:
 { "sections": [ { "heading": "...", "bullets": ["...", "..."] } ] }`;
 
@@ -266,6 +267,7 @@ function parseGeminiErrorMessage(body) {
 
 function buildFallbackHtml({ title, vendor, type, description, pageContextText }) {
   const sourceText = pageContextText || '';
+  const narrativeText = findLabeledText(sourceText, 'Product description and benefits') || sourceText;
   const category = type && String(type).toLowerCase() !== 'main' ? type : '';
   const sections = [
     {
@@ -274,6 +276,10 @@ function buildFallbackHtml({ title, vendor, type, description, pageContextText }
         title ? `${title}${vendor ? ` from ${vendor}` : ''}${category ? ` is a ${category}` : ''}.` : '',
         summarizeText(cleanFallbackLine(description || findFirstMatch(sourceText, ['overview', 'description', 'product'])), 220),
       ],
+    },
+    {
+      heading: 'Why it matters',
+      bullets: findNarrativeMatches(narrativeText, ['independence', 'mobility', 'outdoor', 'errands', 'confidence', 'comfort', 'travel', 'terrain', 'daily', 'home'], 4),
     },
     {
       heading: 'Key specifications and performance',
@@ -329,6 +335,32 @@ function findFirstMatch(text, keywords) {
   return findMatches(text, keywords, 1)[0] || '';
 }
 
+function findLabeledText(text, label) {
+  const lines = String(text || '').split('\n');
+  const prefix = `${label}:`;
+  const match = lines.find((line) => line.startsWith(prefix));
+  return match ? match.slice(prefix.length).split(/\s\|\s[A-Z][^:]{2,}:/)[0].trim() : '';
+}
+
+function findNarrativeMatches(text, keywords, limit) {
+  const seen = new Set();
+  return String(text || '')
+    .split(/[\n|]+/)
+    .map(cleanFallbackLine)
+    .filter((line) => {
+      if (!line || line.length < 50 || line.length > 320) return false;
+      const lower = line.toLowerCase();
+      if (/font-|color:|display:|secure checkout|price match|cdn\/shop|^specs and page details/i.test(line)) return false;
+      if (/\b(capacity|top speed|mph|mile range|travel range|battery|tire|suspension|brake|warranty|delivery options)\b/i.test(line)) return false;
+      if (!keywords.some((keyword) => lower.includes(keyword))) return false;
+      const key = lower.replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 120);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+}
+
 function findMatches(text, keywords, limit) {
   const seen = new Set();
   return String(text || '')
@@ -352,6 +384,7 @@ function cleanFallbackLine(line) {
     .replace(/\b\S+\.com\/\S+/gi, '')
     .replace(/<[^>]*>/g, ' ')
     .replace(/^[\s\-:]+/, '')
+    .replace(/^(Product description and benefits|Specs and page details|Page highlights|Clean product page text):\s*/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
