@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'AI service not configured' });
   }
   const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-  const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   const systemPrompt = `You are a knowledgeable mobility product advisor for Top Mobility.
 Summarize the current product page for a shopper using only the provided product and page context. Do not invent specifications, pricing, warranties, compatibility, availability, or medical claims.
