@@ -86,7 +86,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'AI service not configured' });
   }
   const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-  const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   const systemPrompt = `You are a knowledgeable mobility product advisor for Top Mobility.
 Create a detailed, shopper-facing summary of the current product page using only the provided product and page context. Do not invent specifications, prices, warranties, compatibility, stock status, medical claims, or measurements that are not present in the context.
@@ -209,26 +209,23 @@ async function callGemini({ apiKey, model, systemPrompt, productContext }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 24000);
   const geminiResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
     {
       method: 'POST',
       signal: controller.signal,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemPrompt }],
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: productContext }],
-          },
+        model,
+        max_tokens: 1600,
+        temperature: 0.4,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: productContext },
         ],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 1600,
-          responseMimeType: 'application/json',
-        },
       }),
     }
   ).finally(() => clearTimeout(timeout));
@@ -240,7 +237,7 @@ async function callGemini({ apiKey, model, systemPrompt, productContext }) {
   }
 
   const geminiData = await geminiResponse.json();
-  return geminiData.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
+  return geminiData.choices?.[0]?.message?.content || '';
 }
 
 function parseGroqErrorMessage(body) {
