@@ -12,7 +12,7 @@
   const FALLBACK_ENDPOINT = '/apps/ai-product-info';
   const DEFAULT_ERROR_MESSAGE =
     'AI Product Insights are temporarily unavailable. Please try again shortly.';
-  const FETCH_TIMEOUT_MS = 22000;
+  const FETCH_TIMEOUT_MS = 30000;
 
   // Common Shopify theme product image container selectors (most → least specific)
   const IMAGE_CONTAINER_SELECTORS = [

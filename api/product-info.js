@@ -14,6 +14,10 @@
  * Returns: { html: "<formatted AI response>" }
  */
 
+export const config = {
+  maxDuration: 30,
+};
+
 export default async function handler(req, res) {
   // ── CORS ──────────────────────────────────────────────────────────────────
   const allowedOrigin = process.env.ALLOWED_ORIGIN || '';
@@ -169,7 +173,7 @@ function escapeHtml(str) {
 
 async function callGroq({ apiKey, model, systemPrompt, productContext }) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 6000);
   const groqResponse = await fetch(
     'https://api.groq.com/openai/v1/chat/completions',
     {
@@ -203,7 +207,7 @@ async function callGroq({ apiKey, model, systemPrompt, productContext }) {
 
 async function callGemini({ apiKey, model, systemPrompt, productContext }) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timeout = setTimeout(() => controller.abort(), 24000);
   const geminiResponse = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
