@@ -86,7 +86,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'AI service not configured' });
   }
   const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-  const geminiModels = (process.env.GEMINI_MODEL || 'gemini-3.6-flash,gemini-3.6-flash-lite')
+  const geminiModels = (process.env.GEMINI_MODEL || 'gemini-3.6-flash,gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.0-flash')
     .split(',')
     .map((model) => model.trim())
     .filter(Boolean);
